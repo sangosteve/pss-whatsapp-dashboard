@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ... */
+
+@layer base {
+	/* Light Mode Defaults */
+	/* Light Mode Defaults */
+	:root {
+		--primary: #47a260;
+		--secondary: #ecf3e6;
+		--accent: #101013;
+		--background: #fffefe;
+		--text: #101013;
+		--buttonText: #fffefe;
+		--border: #ecf3e6; /* Add a border color variable */
+	}
+
+	/* Dark Mode Overrides */
+	.dark {
+		--primary: #47a260;
+		--secondary: #ecf3e6;
+		--accent: #101013;
+		--background: #101013;
+		--text: #ecf3e6;
+		--buttonText: #47a260;
+		--border: #ecf3e6; /* Add a border color variable */
+	}
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+}
