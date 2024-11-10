@@ -25,7 +25,6 @@ router.get("/:contactId", verifyToken, async (req, res) => {
 });
 
 // Send a message to a contact (Create message)
-// Send a message to a contact (Create message)
 router.post("/", verifyToken, async (req, res) => {
 	const { contactId, sender, userId, text } = req.body;
 

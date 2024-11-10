@@ -2,8 +2,6 @@ const express = require("express");
 const axios = require("axios");
 const { saveMessageToDB } = require("../utils/messageUtils"); // Saving utility
 const Contact = require("../models/contact"); // Contact model
-const { io } = require("../server"); // Assuming you have initialized Socket.IO here
-console.log("IO instance:", io);
 const router = express.Router();
 const WHATSAPP_API_URL = "https://graph.facebook.com/v21.0";
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -11,6 +9,8 @@ const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 // Send a message through WhatsApp and save it to DB
 router.post("/send-message", async (req, res, next) => {
 	const { contactId, message, userId } = req.body;
+
+	console.log(req.body);
 
 	try {
 		// Find contact in MongoDB
@@ -39,6 +39,16 @@ router.post("/send-message", async (req, res, next) => {
 			new Date(),
 			userId
 		);
+
+		// Update the contact's lastMessage field with the new message
+		const updatedContact = await Contact.findByIdAndUpdate(
+			contactId,
+			{ lastMessage: savedMessage._id },
+			{ new: true }
+		).populate("lastMessage");
+
+		// Emit the updated contact over Socket.IO for real-time UI updates
+		io.emit("contact updated", updatedContact);
 
 		// Send response with both saved message and WhatsApp response
 		res.status(200).json({
