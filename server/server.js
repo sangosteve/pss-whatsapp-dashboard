@@ -187,7 +187,11 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 
 	try {
 		// Extract message details from the webhook
-		const messageData = messageEvent.entry[0].changes[0].value.messages[0];
+		// Safely check for the existence of nested properties
+		const entry = messageEvent?.entry?.[0];
+		const changes = entry?.changes?.[0];
+		const value = changes?.value;
+		const messageData = value?.messages?.[0];
 
 		// Check if there is text in the message
 		if (messageData && messageData.text) {
