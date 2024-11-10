@@ -22,7 +22,7 @@ const Chat: React.FC = () => {
 
     const { messages, fetchMessages, addMessage } = useMessagesStore();
 
-    console.log(messages)
+
 
     useEffect(() => {
         if (!selectedContactId) return;

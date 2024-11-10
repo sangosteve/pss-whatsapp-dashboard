@@ -8,7 +8,7 @@ const contactSchema = new mongoose.Schema(
 		lastMessage: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "Message",
-			default: null, // Default to null if no last message
+			// Default to null if no last message
 		},
 	},
 	{ timestamps: true }

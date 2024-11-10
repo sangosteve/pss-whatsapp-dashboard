@@ -19,7 +19,6 @@ router.post("/send-message", async (req, res, next) => {
 			return res.status(400).json({ error: "Contact not found" });
 		}
 		const phoneNumber = contact.phoneNumber;
-		console.log(phoneNumber);
 
 		// Send message to WhatsApp API
 		const whatsappResponse = await axios.post(

@@ -25,9 +25,9 @@ router.get("/:contactId", verifyToken, async (req, res) => {
 });
 
 // Send a message to a contact (Create message)
+// Send a message to a contact (Create message)
 router.post("/", verifyToken, async (req, res) => {
 	const { contactId, sender, userId, text } = req.body;
-	console.log(req.body);
 
 	if (!contactId || !sender || !text) {
 		return res.status(400).json({ message: "Missing required fields" });
@@ -37,17 +37,24 @@ router.post("/", verifyToken, async (req, res) => {
 		const message = new Message({
 			contact: contactId,
 			sender,
-			userId: sender === "user" ? userId : null, // Only set userId if sender is "user"
+			userId: sender === "user" ? userId : null,
 			text,
 			timestamp: new Date(),
 		});
 
-		await message.save(); // Save message to MongoDB
-		// Optionally, update the contact's last message
-		cosnole.log("Message saved successfully");
-		await Contact.findByIdAndUpdate(contactId, {
-			lastMessage: message._id,
-		});
+		await message.save();
+
+		// Update the contact's lastMessage field
+		const updatedContact = await Contact.findByIdAndUpdate(
+			contactId,
+			{ lastMessage: message._id },
+			{ new: true }
+		).populate("lastMessage");
+
+		// Emit the new message and updated contact to all connected clients
+		io.emit("chat message", message); // Emit new message
+		console.log("Emitting contact updated:", updatedContact);
+		io.emit("contact updated", updatedContact); // Emit updated contact with last message
 
 		res.status(201).json(message);
 	} catch (error) {

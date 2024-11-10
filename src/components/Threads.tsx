@@ -21,9 +21,20 @@ const Threads: React.FC = () => {
         const newSocket = io(SOCKET_SERVER_URL);
         setSocket(newSocket);
 
+        // Listen for chat message updates
+        newSocket.on("chat message", (newMessage) => {
+            // Here you might handle adding the new message to a global or local message state if needed
+            console.log("New message received:", newMessage); // For debugging
+            // Optionally update the contact's last message if needed
+            if (newMessage.contactId) {
+                updateContactLastMessage(newMessage);
+            }
+        });
+
         // Listen for contact updates
         newSocket.on("contact updated", (updatedContact) => {
             // Ensure updatedContact includes the full `lastMessage` object (with `text` and `timestamp`)
+            console.log("testing new message")
             if (updatedContact?.lastMessage?.text && updatedContact?.lastMessage?.timestamp) {
                 updateContactLastMessage(updatedContact); // Update the last message for the contact
             }
@@ -92,3 +103,4 @@ const Threads: React.FC = () => {
 };
 
 export default Threads;
+
