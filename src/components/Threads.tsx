@@ -1,7 +1,7 @@
 // Threads.tsx
 
 import React, { useEffect } from "react";
-import { Bell, Check, Inbox, Settings } from "lucide-react";
+import { Bell, Check, Inbox, Settings, CircleUser } from "lucide-react";
 import useContactsStore from "../store/contactsStore";
 import pImage from "./../assets/pp.jpeg";
 import { io, Socket } from 'socket.io-client';
@@ -68,7 +68,10 @@ const Threads: React.FC = () => {
                         onClick={() => selectContact(contact._id)}
                     >
                         <div className="relative w-12 h-12 shrink-0 before:absolute before:w-3 before:h-3 before:rounded-full before:bottom-0 before:right-0 before:bg-green-500 before:border-2 before:border-white">
-                            <img src={pImage} className="w-full h-full rounded-full overflow-hidden object-cover" alt="Contact" />
+                            {/* <img src={pImage} className="w-full h-full rounded-full overflow-hidden object-cover" alt="Contact" /> */}
+                            <div className="w-full h-full rounded-full flex items-center justify-center bg-zinc-300">
+                                <CircleUser className="w-8 h-8 text-zinc-400" />
+                            </div>
                         </div>
                         <div className="grow pl-4">
                             <div className="flex items-center justify-between">
