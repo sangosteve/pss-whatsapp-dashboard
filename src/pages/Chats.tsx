@@ -22,8 +22,6 @@ const Chat: React.FC = () => {
 
     const { messages, fetchMessages, addMessage } = useMessagesStore();
 
-
-
     useEffect(() => {
         if (!selectedContactId) return;
 
@@ -62,22 +60,24 @@ const Chat: React.FC = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const handleSendMessage = async (messageText: string) => {
+    const handleSendMessage = async (messageText: string, file?: File) => {
         if (!selectedContactId || !userId) return;
 
-        const messageObject = {
-            contactId: selectedContactId,
-            message: messageText,
-            userId: userId,
-        };
+
+
+        const formData = new FormData();
+        formData.append("contactId", selectedContactId);
+        formData.append("userId", userId);
+        formData.append("message", messageText);
+        if (file) {
+            formData.append("file", file);
+        }
 
         try {
+
             const response = await fetch("http://localhost:4000/api/whatsapp/send-message", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(messageObject),
+                body: formData,
             });
 
             if (response.ok) {
@@ -93,6 +93,7 @@ const Chat: React.FC = () => {
             console.error("Error sending message:", error);
         }
     };
+
 
 
     return (

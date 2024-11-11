@@ -1,6 +1,9 @@
 // server.js
 require("dotenv").config();
 const express = require("express");
+const multer = require("multer");
+const FormData = require("form-data"); // Import form-data library
+const fs = require("fs");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -10,8 +13,8 @@ const Message = require("./models/message"); // Import the Message model
 const Contact = require("./models/contact"); // Import the Contact model
 const messageRoutes = require("./routes/messageRoutes"); // Import message routes
 //const whatsappRoutes = require("./routes/whatsappRoutes");
-
-//WHATSAPP ROUTES IMPORTS
+const upload = multer();
+// WHATSAPP ROUTES IMPORTS
 const { saveMessageToDB } = require("./utils/messageUtils");
 const WHATSAPP_API_URL = "https://graph.facebook.com/v21.0";
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
@@ -35,7 +38,7 @@ app.use("/api/contacts", contactRoutes);
 app.use("/api/auth", authRoutes);
 app.use(userRoutes);
 app.use("/api/messages", messageRoutes); // Register the message routes here
-//app.use("/api/whatsapp", whatsappRoutes);
+// app.use("/api/whatsapp", whatsappRoutes);
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -93,7 +96,6 @@ io.on("connection", (socket) => {
 
 			// Emit the new message and updated contact to all clients
 			io.emit("chat message", message); // Emit the new message
-
 			io.emit("contact updated", updatedContact); // Emit updated contact with last message
 		} catch (error) {
 			console.error("Error saving message:", error);
@@ -108,57 +110,165 @@ io.on("connection", (socket) => {
 // WHATSAPP ROUTES
 
 // Send a message through WhatsApp and save it to DB
-app.post("/api/whatsapp/send-message", async (req, res, next) => {
-	const { contactId, message, userId } = req.body;
+// WHATSAPP ROUTES
 
-	try {
-		// Find contact in MongoDB
-		const contact = await Contact.findById(contactId);
-		if (!contact) {
-			return res.status(400).json({ error: "Contact not found" });
+// Send a message through WhatsApp and save it to DB
+app.post(
+	"/api/whatsapp/send-message",
+	upload.single("file"), // Multer handles the file upload
+	async (req, res, next) => {
+		const { contactId, message, userId } = req.body;
+		const file = req.file; // This is the file uploaded
+
+		try {
+			// Find contact in MongoDB
+			const contact = await Contact.findById(contactId);
+			if (!contact) {
+				return res.status(400).json({ error: "Contact not found" });
+			}
+			const phoneNumber = contact.phoneNumber;
+
+			// Check if there is a file to send
+			if (file) {
+				const fileFormData = new FormData();
+				const fileBuffer = Buffer.from(file.buffer);
+				fileFormData.append("file", fileBuffer, {
+					filename: file.originalname,
+					contentType: file.mimetype,
+				});
+
+				// Determine the media type dynamically based on the file's MIME type
+				let mediaType;
+				if (file.mimetype.startsWith("image/")) {
+					mediaType = "image";
+				} else if (file.mimetype.startsWith("video/")) {
+					mediaType = "video";
+				} else if (file.mimetype.startsWith("audio/")) {
+					mediaType = "audio";
+				} else if (file.mimetype === "application/pdf") {
+					mediaType = "document";
+				} else {
+					mediaType = "document"; // Default to document for unsupported file types
+				}
+
+				// Add the 'type' and 'messaging_product' parameters
+				fileFormData.append("type", mediaType); // Set dynamic media type
+				fileFormData.append("messaging_product", "whatsapp"); // Add this to specify it's for WhatsApp
+
+				try {
+					// Make the media upload request
+					const mediaResponse = await axios.post(
+						`${WHATSAPP_API_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/media`,
+						fileFormData,
+						{
+							headers: {
+								Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+								// Do not set the Content-Type header manually when using FormData
+							},
+						}
+					);
+
+					const mediaId = mediaResponse.data.id;
+
+					// Ensure messaging_product is included in the message body
+					const messageBody = {
+						messaging_product: "whatsapp", // Required parameter
+						to: phoneNumber, // Replace with the recipient's phone number
+						type: mediaType, // Use dynamic media type
+						[mediaType]: {
+							id: mediaId, // The ID of the uploaded media
+						},
+					};
+
+					// Send the media message to WhatsApp
+					const whatsappResponse = await axios.post(
+						`${WHATSAPP_API_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+						messageBody,
+						{
+							headers: {
+								Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+							},
+						}
+					);
+
+					console.log("WhatsApp message sent:", whatsappResponse.data);
+
+					// Save the sent message to the database
+					const savedMessage = await saveMessageToDB(
+						contactId,
+						"user",
+						message || "File sent",
+						new Date(),
+						userId,
+						file ? mediaId : null
+					);
+
+					// Update the contact's lastMessage field
+					const updatedContact = await Contact.findByIdAndUpdate(
+						contactId,
+						{ lastMessage: savedMessage._id },
+						{ new: true }
+					).populate("lastMessage");
+
+					// Emit updated contact over Socket.IO for real-time updates
+					io.emit("contact updated", updatedContact);
+
+					// Send response with saved message and WhatsApp response
+					res.status(200).json({
+						message: "Message sent",
+						savedMessage,
+						whatsappResponse: whatsappResponse.data,
+					});
+				} catch (error) {
+					console.error(
+						"Error while sending message:",
+						error.response ? error.response.data : error.message
+					);
+					next(error);
+				}
+			} else {
+				// If no file, send a text message
+				const whatsappResponse = await axios.post(
+					`${WHATSAPP_API_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+					{
+						messaging_product: "whatsapp", // Ensure messaging_product is included here
+						to: phoneNumber,
+						text: { body: message },
+					},
+					{ headers: { Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}` } }
+				);
+
+				// Save sent message to MongoDB
+				const savedMessage = await saveMessageToDB(
+					contactId,
+					"user",
+					message,
+					new Date(),
+					userId
+				);
+
+				// Update the contact's lastMessage field
+				const updatedContact = await Contact.findByIdAndUpdate(
+					contactId,
+					{ lastMessage: savedMessage._id },
+					{ new: true }
+				).populate("lastMessage");
+
+				// Emit updated contact over Socket.IO
+				io.emit("contact updated", updatedContact);
+
+				// Send response with saved message and WhatsApp response
+				res.status(200).json({
+					message: "Message sent",
+					savedMessage,
+					whatsappResponse: whatsappResponse.data,
+				});
+			}
+		} catch (error) {
+			next(error); // Pass to error handler middleware
 		}
-		const phoneNumber = contact.phoneNumber;
-
-		// Send message to WhatsApp API
-		const whatsappResponse = await axios.post(
-			`${WHATSAPP_API_URL}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
-			{
-				messaging_product: "whatsapp",
-				to: phoneNumber,
-				text: { body: message },
-			},
-			{ headers: { Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}` } }
-		);
-
-		// Save sent message to MongoDB
-		const savedMessage = await saveMessageToDB(
-			contactId,
-			"user",
-			message,
-			new Date(),
-			userId
-		);
-
-		// Update the contact's lastMessage field with the new message
-		const updatedContact = await Contact.findByIdAndUpdate(
-			contactId,
-			{ lastMessage: savedMessage._id },
-			{ new: true }
-		).populate("lastMessage");
-
-		// Emit the updated contact over Socket.IO for real-time UI updates
-		io.emit("contact updated", updatedContact);
-
-		// Send response with both saved message and WhatsApp response
-		res.status(200).json({
-			message: "Message sent",
-			savedMessage,
-			whatsappResponse: whatsappResponse.data,
-		});
-	} catch (error) {
-		next(error); // Pass to error handler middleware
 	}
-});
+);
 
 // Webhook Route for WhatsApp
 app.get("/api/whatsapp/webhook", (req, res) => {
@@ -183,83 +293,41 @@ app.get("/api/whatsapp/webhook", (req, res) => {
 // Webhook Endpoint to Receive Messages from WhatsApp
 
 app.post("/api/whatsapp/webhook", async (req, res) => {
-	const messageEvent = req.body;
+	const entry = req.body.entry[0];
+	const changes = entry.changes[0];
+	const value = changes.value;
+	const messageData = value.messages ? value.messages[0] : null;
 
-	try {
-		// Extract message details from the webhook
-		// Safely check for the existence of nested properties
-		const entry = messageEvent?.entry?.[0];
-		const changes = entry?.changes?.[0];
-		const value = changes?.value;
-		const messageData = value?.messages?.[0];
+	if (messageData) {
+		const { from, id, timestamp, text } = messageData;
 
-		// Check if there is text in the message
-		if (messageData && messageData.text) {
-			const { from, text, timestamp } = messageData;
+		const contact = await Contact.findOne({ phoneNumber: from });
 
-			// Ensure the 'from' number starts with '+' for consistency
-			let senderPhone = from;
-			if (senderPhone && !senderPhone.startsWith("+")) {
-				senderPhone = "+" + senderPhone; // Prepend '+' if missing
-			}
-
-			// Extract the actual text from the text object
-			const messageText = text.body;
-
-			// Convert the Unix timestamp to milliseconds
-			const messageTimestamp = new Date(timestamp * 1000); // Convert to milliseconds
-
-			// Check if the timestamp is valid
-			if (isNaN(messageTimestamp.getTime())) {
-				throw new Error("Invalid timestamp: " + timestamp);
-			}
-
-			// Check if a contact with this phone number already exists
-			let contact = await Contact.findOne({ phoneNumber: senderPhone });
-
-			if (!contact) {
-				// If contact does not exist, create a new contact
-				contact = await Contact.create({
-					phoneNumber: senderPhone, // Use the phone number from the message
-					name: senderPhone, // Default name, you can improve this logic as needed
-				});
-			}
-
-			// Save the incoming message to MongoDB
+		if (contact) {
+			// Save the incoming message in MongoDB
 			const savedMessage = new Message({
-				contact: contact._id, // The contact who sent the message
-				sender: "contact", // Sender type (contact)
-				text: messageText, // Message text
-				timestamp: messageTimestamp, // Use the parsed timestamp
+				contact: contact._id,
+				sender: "contact",
+				text: text.body,
+				timestamp: new Date(timestamp * 1000),
 			});
-
-			// Save the message in the database
 			await savedMessage.save();
 
-			// Update the contact's lastMessage field to point to this newly saved message
-			const updatedContact = await Contact.findByIdAndUpdate(
-				contact._id,
-				{ lastMessage: savedMessage._id },
-				{ new: true }
-			).populate("lastMessage"); // Populate the lastMessage to include its details
+			// Update the contact's last message reference
+			contact.lastMessage = savedMessage._id;
+			await contact.save();
 
-			// Emit the incoming message via Socket.IO for real-time updates
+			// Emit the new message and updated contact to all clients
 			io.emit("chat message", savedMessage);
-			io.emit("contact updated", updatedContact);
-
-			// Respond with status 200 (success) to WhatsApp's request
-			return res.sendStatus(200);
-		} else {
-			// If the message does not contain text, just acknowledge the webhook
-			return res.sendStatus(200);
+			io.emit("contact updated", contact);
 		}
-	} catch (error) {
-		console.error("Error handling incoming message:", error);
-		return res.status(500).send("Internal Server Error");
 	}
+
+	res.status(200).send("EVENT_RECEIVED");
 });
 
-const PORT = 4000;
+// Start the server
+const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
-	console.log(`Server running on http://localhost:${PORT}`);
+	console.log(`Server is running on port ${PORT}`);
 });
