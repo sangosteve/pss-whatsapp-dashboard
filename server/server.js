@@ -301,7 +301,7 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 	if (messageData) {
 		const { from, id, timestamp, text } = messageData;
 
-		const contact = await Contact.findOne({ phoneNumber: from });
+		const contact = await Contact.findOne({ phoneNumber: "+" + from });
 
 		if (contact) {
 			// Save the incoming message in MongoDB
@@ -316,6 +316,8 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 			// Update the contact's last message reference
 			contact.lastMessage = savedMessage._id;
 			await contact.save();
+
+			console.log("contacts last message", contact.lastMessage);
 
 			// Emit the new message and updated contact to all clients
 			io.emit("chat message", savedMessage);

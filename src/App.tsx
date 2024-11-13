@@ -10,6 +10,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
 import Inbox from "./pages/Inbox"
+import CreateTemplate from "./pages/CreateTemplate"
+import Templates from "./pages/Templates"
 
 const App: React.FC = () => {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -38,6 +40,9 @@ const App: React.FC = () => {
         >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/inbox" element={<Inbox />} />
+          <Route path="/templates/" element={<Templates />} />
+
+          <Route path="/templates/create" element={<CreateTemplate />} />
           <Route path="/reports" element={<Reports />} />
         </Route>
       </Routes>

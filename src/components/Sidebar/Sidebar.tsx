@@ -26,9 +26,9 @@ const Sidebar: React.FC = () => {
             title: "Message Templates",
             icon: <DocumentTextIcon className="size-5 font-medium " />,
             subItems: [
-                { id: uuidv4(), title: "customers", href: "/customers" },
-                { id: uuidv4(), title: "vendors", href: "/vendors" },
-                { id: uuidv4(), title: "users", href: "/users" },
+                { id: uuidv4(), title: "Templates", href: "/templates" },
+                { id: uuidv4(), title: "Create New", href: "/templates/create" },
+
             ],
         },
         {
