@@ -1,30 +1,27 @@
 // App.tsx
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import useAuthStore from '@/store/authStores';
 import AuthLayout from './components/AuthLayout';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
-import Chats from './pages/Chats';
+import Reports from './pages/Reports';
+import Inbox from "./pages/Inbox"
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, checkAuth } = useAuthStore();
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      setIsAuthenticated(true); // Update authentication state
-    }
-  }, []);
+    checkAuth(); // Check auth status on app load
+  }, [checkAuth]);
 
   return (
     <Router> {/* This is the single, top-level Router */}
       <Routes>
         {/* Redirect from "/" to "/login" if not authenticated */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-
+        <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
         {/* Authentication Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
@@ -39,9 +36,9 @@ const App: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          {/* <Route path="/dashboard" element={<Dashboard />} /> */}
-          <Route path="/chats" element={<Chats />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/reports" element={<Reports />} />
         </Route>
       </Routes>
     </Router>
