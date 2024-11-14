@@ -314,14 +314,19 @@ app.post("/api/whatsapp/webhook", async (req, res) => {
 			await savedMessage.save();
 
 			// Update the contact's last message reference
+			// Update the contact's last message reference
 			contact.lastMessage = savedMessage._id;
 			await contact.save();
 
-			console.log("contacts last message", contact.lastMessage);
+			// Retrieve and populate the updated contact with lastMessage details
+			const updatedContact = await Contact.findById(contact._id).populate({
+				path: "lastMessage",
+				select: "text timestamp", // Only retrieve text and timestamp fields
+			});
 
-			// Emit the new message and updated contact to all clients
+			// Emit the new message and updated contact with populated lastMessage to all clients
 			io.emit("chat message", savedMessage);
-			io.emit("contact updated", contact);
+			io.emit("contact updated", updatedContact);
 		}
 	}
 

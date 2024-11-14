@@ -3,7 +3,6 @@
 import React, { useEffect } from "react";
 import { Bell, Check, Inbox, Settings, CircleUser } from "lucide-react";
 import useContactsStore from "../store/contactsStore";
-import pImage from "./../assets/pp.jpeg";
 import { io, Socket } from 'socket.io-client';
 import SearchField from "./SearchField";
 
@@ -34,7 +33,7 @@ const Threads: React.FC = () => {
         // Listen for contact updates
         newSocket.on("contact updated", (updatedContact) => {
             // Ensure updatedContact includes the full `lastMessage` object (with `text` and `timestamp`)
-            console.log("testing new message")
+            console.log("testing new message:", updatedContact)
             if (updatedContact?.lastMessage?.text && updatedContact?.lastMessage?.timestamp) {
                 updateContactLastMessage(updatedContact); // Update the last message for the contact
             }
